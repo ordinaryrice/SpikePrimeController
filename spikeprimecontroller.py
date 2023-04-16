@@ -1,7 +1,7 @@
 #SPIKE Controller
 #author：HF@ordinaryrice
 #使い方
-#   SPIKEアプリ（バージョン1.3.0-2.0.0未満？）で「新しいプロジェクト」→「パイソン」を選んで、
+#   SPIKEアプリ（バージョン2.x.x）で「新しいプロジェクト」→「Python」を選んで、
 #   このコードを全てコピー＆ペーストします。
 #   PoweredUPやControl+のハブ（電池ボックス）にLモーターまたはXLモーターを合計2個つなぎます。
 #   SPIKEハブに圧力センサーとカラーセンサーをつないで左側を下にして横向きに持ち、
@@ -50,10 +50,10 @@ posMax = 150 # サーボの最大回転角（片側あたり）
 inv_color = 'white'
 #パラメータ設定ここまで
 
-_IRQ_SCAN_RESULT                    = const(1 << 4) # デバイススキャン結果取得
-_IRQ_PERIPHERAL_CONNECT            = const(1 << 6) # 接続完了
-_IRQ_GATTC_SERVICE_RESULT            = const(1 << 8) # サービススキャン結果取得
-_IRQ_GATTC_CHARACTERISTIC_RESULT    = const(1 << 9) # キャラクタリスティックスキャン結果取得
+_IRQ_SCAN_RESULT                    = const(5)  # デバイススキャン結果取得
+_IRQ_PERIPHERAL_CONNECT             = const(7)  # 接続完了
+_IRQ_GATTC_SERVICE_RESULT           = const(9)  # サービススキャン結果取得
+_IRQ_GATTC_CHARACTERISTIC_RESULT    = const(11) # キャラクタリスティックスキャン結果取得
 
 class TechnicHub:
     service_uuid = ubluetooth.UUID('00001623-1212-efde-1623-785feabcd123') # PowerdUPやControl+のサービスUUID
