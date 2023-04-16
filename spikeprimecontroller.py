@@ -34,11 +34,11 @@ from micropython import const
 from ustruct import unpack
 
 #パラメータ設定ここから
-timeout = 20 # Bluetooth接続のタイムアウト時間（秒）
+timeout  = 20  # Bluetooth接続のタイムアウト時間（秒）
 interval = 0.1 # メインループの長さ（秒）
 
 #PoweredUPやControl+に接続したモーターのポートを指定する
-servo = 1 # サーボモーター（ポート：A=0, B=1, C=2, D=3）
+servo  = 1 # サーボモーター（ポート：A=0, B=1, C=2, D=3）
 engine = 3 # エンジンモーター
 
 #SPIKEプライムに接続したセンサーのポートを指定する
@@ -58,7 +58,7 @@ _IRQ_GATTC_CHARACTERISTIC_RESULT    = const(11) # キャラクタリスティッ
 
 class TechnicHub:
     service_uuid = ubluetooth.UUID('00001623-1212-efde-1623-785feabcd123') # PowerdUPやControl+のサービスUUID
-    char_uuid = ubluetooth.UUID('00001624-1212-efde-1623-785feabcd123') # キャラクタイスティックUUID
+    char_uuid    = ubluetooth.UUID('00001624-1212-efde-1623-785feabcd123') # キャラクタイスティックUUID
     
     def __init__(self):
         self.phub = PrimeHub() # プライムハブ初期化
@@ -70,10 +70,12 @@ class TechnicHub:
         self.ble = ubluetooth.BLE() # Bluetoothを初期化
         self.ble.irq(self.handler) # コールバック関数を指定
         self.ble.active(True) # Bluetooth アクティブ
-        self.conn_handle = 0 # conn_handle
+        self.conn_handle  = 0 # conn_handle
         self.value_handle = 0 # value_handle
+        
         self.ble.gap_advertise() # アドバタイズ開始
         wait_for_seconds(1)
+        
         self.ble.gap_scan(timeout * 1000) # 周辺のデバイスを検索
         for i in range(timeout): # 接続できたor時間切れまで待つ
             self.phub.light_matrix.show_image("ARROW_N")
@@ -84,34 +86,41 @@ class TechnicHub:
             wait_for_seconds(0.25)
             self.phub.light_matrix.show_image("ARROW_W")
             wait_for_seconds(0.25)
-            if self.connected: break
+            if self.connected: break # 接続完了したらforループを抜ける
+        
         if not self.connected: exit() # 時間切れならプログラム終了
-        wait_for_seconds(1)
+        wait_for_seconds(1) # 少し待つ
+        
         while not self.running:
             wait_for_seconds(1) # デバイス初期化が済むまで待つ
-        wait_for_seconds(1)
+        
+        wait_for_seconds(1) # 少し待つ
         self.main() # メインループ
 
     def handler(self, event, data):
         if event == _IRQ_SCAN_RESULT: # アドバタイズ中
             if b'\x90\x84\x2B' == data[1][0:3]: # MACアドレスの左半分がPowerdUPやControl+なら
                 self.ble.gap_connect(data[0], data[1]) # 接続する
-                self.connected = True
+                self.connected = True # 接続完了をメイン処理に伝える
+        
         elif event == _IRQ_PERIPHERAL_CONNECT: # 接続出来たら
             self.conn_handle = data[0] # conn_handleを取得
             self.ble.gattc_discover_services(self.conn_handle) # サービス検索
-            wait_for_seconds(1.5)
+            wait_for_seconds(1.5) # 少し待つ
+        
         elif event == _IRQ_GATTC_SERVICE_RESULT: # サービスの検索結果
             if data[3] == TechnicHub.service_uuid: # 目的のサービスUUIDなら
                 self.ble.gattc_discover_characteristics(self.conn_handle, 0x1, 0xffff) # キャラクタリスティック検索
+        
         elif event == _IRQ_GATTC_CHARACTERISTIC_RESULT: # キャラクタリスティックの検索結果
             if data[4] == TechnicHub.char_uuid: # 目的のキャラクタリスティックUUIDなら
                 self.value_handle = data[2] # value_handleを取得
                 self.send(bytes([0x81, servo, 0x10, 0x05, 0xf4, 0x01, 0x01])) # サーボモーターの加速をなめらかになるように設定
-                wait_for_seconds(0.5)
+                wait_for_seconds(0.5) # 少し待つ
                 self.running = True # デバイス初期化完了、メインループへ
+        
         elif event == _IRQ_PERIPHERAL_DISCONNECT: # 切断出来たら
-            self.running = False # メインループを終了する
+            self.running   = False # メインループを終了する
             self.connected = False # 切断完了を切断待機ループに伝える
             exit() # プログラム終了
 
@@ -122,7 +131,7 @@ class TechnicHub:
             pass # スルー
 
     def accel(self): # エンジンモーター制御関数
-        acc = self.force.get_force_percentage() # 圧力センサー読み取り
+        acc = self.force.get_force_percentage() # 圧力センサー読み取り（単位：％）
         # ライトマトリクスにメーターを表示
         if acc < 25:
             self.phub.light_matrix.show_image('CLOCK10')
@@ -152,23 +161,26 @@ class TechnicHub:
 
     def steering(self): # サーボモーター制御関数
         pitch = self.phub.motion_sensor.get_pitch_angle() # PRIMEハブのピッチ角（-90～+90）を取得
-        pos = int(pitch / 90 * posMax) # ピッチ角をサーボの回転角にマッピング
-        if pos > posMax: pos = posMax # 角度がオーバーしないようにする
+        pos = pitch * posMax // 90      # ピッチ角をサーボの回転角にマッピング
+        if pos > posMax: pos = posMax   # 角度がオーバーしないようにする
         if pos < -posMax: pos = -posMax # 角度がオーバーしないようにする
         self.send(bytes([0x81, servo, 0x10, 0x0d]) + pos.to_bytes(4, "little") + bytes([100, 50, 127, 1, 0x01])) # サーボモーターにコマンド送信
 
     def main(self): # メインループ
-        dt = interval * 0.5 # ループ1回あたり2回コマンドを送信するので
-        while self.running:  # ループ
-            self.accel() # エンジンモーターにコマンドを送る
+        dt = interval * 0.5    # ループ1回あたり2回コマンドを送信するので
+        
+        while self.running:    # メインループ
+            self.accel()         # エンジンモーターにコマンドを送る
             wait_for_seconds(dt) # 少し待つ
-            self.steering() # サーボモーターにコマンドを送る
+            self.steering()      # サーボモーターにコマンドを送る
             wait_for_seconds(dt) # 少し待つ
             if self.phub.left_button.is_pressed() or self.phub.right_button.is_pressed(): # 右・左のボタンが押されたとき
                 self.running = False # ループを止める
+        
         self.ble.gap_disconnect(self.conn_handle) # 接続解除
-        while self.connected: # 切断待ちループ
-            wait_for_seconds(1) # 切断完了まで待機
+        while self.connected:    # 切断待ちループ
+            wait_for_seconds(1)  # 切断完了まで待機
+        
         exit() # プログラム終了
 
 technichub = TechnicHub() # プログラムを実行
