@@ -52,6 +52,7 @@ inv_color = 'white'
 
 _IRQ_SCAN_RESULT                    = const(5)  # デバイススキャン結果取得
 _IRQ_PERIPHERAL_CONNECT             = const(7)  # 接続完了
+_IRQ_PERIPHERAL_DISCONNECT          = const(8)  # 切断完了
 _IRQ_GATTC_SERVICE_RESULT           = const(9)  # サービススキャン結果取得
 _IRQ_GATTC_CHARACTERISTIC_RESULT    = const(11) # キャラクタリスティックスキャン結果取得
 
@@ -109,6 +110,10 @@ class TechnicHub:
                 self.send(bytes([0x81, servo, 0x10, 0x05, 0xf4, 0x01, 0x01])) # サーボモーターの加速をなめらかになるように設定
                 wait_for_seconds(0.5)
                 self.running = True # デバイス初期化完了、メインループへ
+        elif event == _IRQ_PERIPHERAL_DISCONNECT: # 切断出来たら
+            self.running = False # メインループを終了する
+            self.connected = False # 切断完了を切断待機ループに伝える
+            exit() # プログラム終了
 
     def send(self, data): #PowerdUPやControl+にコマンド送信する関数
         try:
@@ -162,7 +167,8 @@ class TechnicHub:
             if self.phub.left_button.is_pressed() or self.phub.right_button.is_pressed(): # 右・左のボタンが押されたとき
                 self.running = False # ループを止める
         self.ble.gap_disconnect(self.conn_handle) # 接続解除
-        wait_for_seconds(1)
+        while self.connected: # 切断待ちループ
+            wait_for_seconds(1) # 切断完了まで待機
         exit() # プログラム終了
 
 technichub = TechnicHub() # プログラムを実行
